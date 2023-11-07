@@ -683,13 +683,13 @@ if __name__ == "__main__":
         )
 
     else:
-        # main(
-        #     field=args.field,
-        #     catalog=catalog,
-        #     params=params,
-        #     saveName=saveName,
-        #     nproc=args.nproc,
-        #     overwrite=args.overwrite,
-        # )
+        main(
+            field=args.field,
+            catalog=catalog,
+            params=params,
+            saveName=saveName,
+            nproc=args.nproc,
+            overwrite=args.overwrite,
+        )
 
         mkFinalOutput(field=args.field, catalog=catalog, params=params, saveName=saveName)

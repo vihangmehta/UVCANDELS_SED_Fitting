@@ -117,7 +117,6 @@ def combinePregrids(params, redshiftIndex):
 if __name__ == "__main__":
     params = getParams(runVersion="v1")
 
-    # for redshiftIndex in range(len(params["zbins"])):
-    for redshiftIndex in range(13, len(params["zbins"])):
+    for redshiftIndex in range(len(params["zbins"])):
         main(params=params, redshiftIndex=redshiftIndex, plotDist=True)
         combinePregrids(params=params, redshiftIndex=redshiftIndex)

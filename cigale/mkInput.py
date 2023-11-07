@@ -143,54 +143,54 @@ def main(saveDir):
         runBashCommand("ln -s ../pcigale.ini.spec .", cwd=workDir, verbose=False)
         np.savetxt(os.path.join(workDir, "catalog.cat"), chunk, fmt=fmt, header=hdr)
 
-    # Ntot = 0
-    # zrange = [
-    #     0,
-    #     0.25,
-    #     0.5,
-    #     0.75,
-    #     1,
-    #     1.25,
-    #     1.5,
-    #     1.75,
-    #     2,
-    #     2.25,
-    #     2.5,
-    #     2.75,
-    #     3,
-    #     3.5,
-    #     4,
-    #     4.5,
-    #     5,
-    #     5.5,
-    #     6,
-    #     6.5,
-    #     7,
-    #     7.5,
-    #     8,
-    #     8.5,
-    #     9,
-    #     9.5,
-    #     10,
-    #     10.5,
-    #     15,
-    # ]
+    Ntot = 0
+    zrange = [
+        0,
+        0.25,
+        0.5,
+        0.75,
+        1,
+        1.25,
+        1.5,
+        1.75,
+        2,
+        2.25,
+        2.5,
+        2.75,
+        3,
+        3.5,
+        4,
+        4.5,
+        5,
+        5.5,
+        6,
+        6.5,
+        7,
+        7.5,
+        8,
+        8.5,
+        9,
+        9.5,
+        10,
+        10.5,
+        15,
+    ]
 
-    # for i, (z0, z1) in enumerate(zip(zrange[:-1], zrange[1:])):
-    #     workDir = os.path.join(saveDir, "worker%02d" % (i + 1))
-    #     cat = combinedCat[(z0 <= combinedCat["ZSPEC"]) & (combinedCat["ZSPEC"] < z1)]
-    #     Ntot += len(cat)
+    for i, (z0, z1) in enumerate(zip(zrange[:-1], zrange[1:])):
+        workDir = os.path.join(saveDir, "worker%02d" % (i + 1))
+        cat = combinedCat[(z0 <= combinedCat["ZSPEC"]) & (combinedCat["ZSPEC"] < z1)]
+        Ntot += len(cat)
 
-    #     print(
-    #         "\rWriting out sub-file %s (%4.2f<z<%4.2f) -- %5d gals -- %2d/%2d"
-    #         % (workDir, z0, z1, len(cat), i + 1, len(zrange) - 1),
-    #         flush=True,
-    #     )
+        print(
+            "\rWriting out sub-file %s (%4.2f<z<%4.2f) -- %5d gals -- %2d/%2d"
+            % (workDir, z0, z1, len(cat), i + 1, len(zrange) - 1),
+            flush=True,
+        )
 
-    #     runBashCommand("mkdir -p %s" % workDir, cwd=saveDir, verbose=False)
-    #     runBashCommand("ln -s ../pcigale.ini .", cwd=workDir, verbose=False)
-    #     runBashCommand("ln -s ../pcigale.ini.spec .", cwd=workDir, verbose=False)
-    #     np.savetxt(os.path.join(workDir, "catalog.cat"), cat, fmt=fmt, header=hdr)
+        runBashCommand("mkdir -p %s" % workDir, cwd=saveDir, verbose=False)
+        runBashCommand("ln -s ../pcigale.ini .", cwd=workDir, verbose=False)
+        runBashCommand("ln -s ../pcigale.ini.spec .", cwd=workDir, verbose=False)
+        np.savetxt(os.path.join(workDir, "catalog.cat"), cat, fmt=fmt, header=hdr)
 
     print("Total objects: {:d}/{:d}".format(Ntot, len(combinedCat)))
 
