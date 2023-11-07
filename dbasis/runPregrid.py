@@ -4,10 +4,7 @@ from utilsDBasis import *
 from plotUtils import *
 
 
-def generatePregrid(
-    Npts, priors, gridPath, gridName, filterList=filterList, filterDir=filterDir
-):
-
+def generatePregrid(Npts, priors, gridPath, gridName, filterList=filterList, filterDir=filterDir):
     import dense_basis as db
 
     db.generate_atlas(
@@ -22,7 +19,6 @@ def generatePregrid(
 
 
 def worker(chunkIndex, redshiftIndex, params, priors):
-
     pregridName = getPregridName(
         params=params,
         z0=params["zbins"][redshiftIndex][0],
@@ -42,7 +38,6 @@ def worker(chunkIndex, redshiftIndex, params, priors):
 
 
 def main(params, redshiftIndex, plotDist=False):
-
     from schwimmbad import MultiPool
     from functools import partial
 
@@ -67,16 +62,13 @@ def main(params, redshiftIndex, plotDist=False):
     with MultiPool(processes=params["Nproc"]) as pool:
         values = list(
             pool.map(
-                partial(
-                    worker, redshiftIndex=redshiftIndex, params=params, priors=priors
-                ),
+                partial(worker, redshiftIndex=redshiftIndex, params=params, priors=priors),
                 range(params["Nproc"]),
             )
         )
 
 
 def combinePregrids(params, redshiftIndex):
-
     import hickle
 
     atlas = {}
@@ -92,7 +84,6 @@ def combinePregrids(params, redshiftIndex):
     ]
 
     for i, pregridName in enumerate(pregridList):
-
         print(
             "\rProcessing pregrid chunk#%3d/%3d ... " % (i + 1, len(pregridList)),
             end="",
@@ -124,9 +115,9 @@ def combinePregrids(params, redshiftIndex):
 
 
 if __name__ == "__main__":
+    params = getParams(runVersion="v1")
 
-    params = getParams(runVersion="test")
-
-    for redshiftIndex in range(len(params["zbins"])):
+    # for redshiftIndex in range(len(params["zbins"])):
+    for redshiftIndex in range(13, len(params["zbins"])):
         main(params=params, redshiftIndex=redshiftIndex, plotDist=True)
         combinePregrids(params=params, redshiftIndex=redshiftIndex)

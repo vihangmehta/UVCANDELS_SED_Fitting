@@ -1,7 +1,6 @@
 {
     "goodsn": {
         "LBC_U": "LBC_U_FLUX",
-        "F275W": "WFC3_F275W_FLUX_NEW",
         "F435W": "ACS_F435W_FLUX",
         "F606W": "ACS_F606W_FLUX",
         "F775W": "ACS_F775W_FLUX",

@@ -1,15 +1,14 @@
 from useful import *
 from utils import *
 
-pregridPath = os.path.join(cwd, "dbasis/pregrids.test/")
+pregridPath = os.path.join(cwd, "dbasis/pregrids/")
 plotdirPath = os.path.join(cwd, "dbasis/plots/")
 outputPath = os.path.join(cwd, "dbasis/output/")
 filterDir = os.path.join(cwd, "dbasis/filters/")
 filterList = "filter_list_uvc.dat"
 
 
-def getPriors(zmin=1e-4, zmax=12, Npars=3, verbose=False):
-
+def getPriors(zmin=1e-4, zmax=12, Npars=4, verbose=False):
     import dense_basis as db
 
     priors = db.Priors()
@@ -30,7 +29,7 @@ def getPriors(zmin=1e-4, zmax=12, Npars=3, verbose=False):
     priors.massmet_width = 0.3
 
     priors.dust_model = "Calzetti"  # options are 'Calzetti' and 'CF00'
-    priors.dust_prior = "exp"  # options are 'exp' and 'flat'
+    priors.dust_prior = "flat"  # options are 'exp' and 'flat'
     priors.Av_min = 0.0
     priors.Av_max = 4.0
     priors.Av_exp_scale = 1.0
@@ -39,11 +38,9 @@ def getPriors(zmin=1e-4, zmax=12, Npars=3, verbose=False):
     priors.tx_alpha = 5.0  # [22.0,8.0,7.0,7.0]
     priors.Nparam = Npars
 
-    priors.decouple_sfr = False
+    priors.decouple_sfr = True
     priors.decouple_sfr_time = 100  # in Myr
-    priors.dynamic_decouple = (
-        False  # set decouple time according to redshift (100 Myr at z=0.1)
-    )
+    priors.dynamic_decouple = False  # set decouple time according to redshift (100 Myr at z=0.1)
 
     if verbose:
         priors.print_priors()
@@ -52,7 +49,6 @@ def getPriors(zmin=1e-4, zmax=12, Npars=3, verbose=False):
 
 
 def getParams(runVersion, redshiftErrFloor=0.03):
-
     zbinsOrig = np.array(
         [
             0.0,
@@ -70,34 +66,14 @@ def getParams(runVersion, redshiftErrFloor=0.03):
             6.0,
             6.5,
             7.0,
+            8.0,
+            9.0,
             10.0,
+            11.0,
+            12.0,
         ]
     )
-    overlaps = np.zeros(len(zbinsOrig)) + 0.1
-
-    # zbinsOrig = np.array(
-    #     [
-    #         0.0,
-    #         0.5,
-    #         1.0,
-    #         1.5,
-    #         2.0,
-    #         2.5,
-    #         3.0,
-    #         3.5,
-    #         4.0,
-    #         4.5,
-    #         5.0,
-    #         5.5,
-    #         6.0,
-    #         6.5,
-    #         7.0,
-    #         8.0,
-    #         9.0,
-    #         10.5,
-    #     ]
-    # )
-    # overlaps = np.clip(ceilForFloats(redshiftErrFloor * (1 + zbinsOrig), 1), 0.1, 0.5)
+    overlaps = np.clip(ceilForFloats(redshiftErrFloor * (1 + zbinsOrig), 1), 0.1, 0.5)
 
     zbins = [
         [
@@ -108,17 +84,15 @@ def getParams(runVersion, redshiftErrFloor=0.03):
     ]
 
     if runVersion == "v1":
-
         params = {
             "Nproc": 35,
-            "Npts_iter": 100000,
+            "Npts_iter": 50000,
             "Npars": 4,
             "zbins": zbins,
             "prefix": "uvc_%s" % runVersion,
         }
 
     elif runVersion == "test":
-
         params = {
             "Nproc": 35,
             "Npts_iter": 10000,
@@ -135,13 +109,10 @@ def getParams(runVersion, redshiftErrFloor=0.03):
 
 
 def getRedshiftIndex(params, zred):
-
     zred = np.atleast_1d(zred)
     zID = np.zeros_like(zred, dtype=int) - 99
 
-    for idx, (z0, z1) in enumerate(
-        zip(params["zbins_orig"][:-1], params["zbins_orig"][1:])
-    ):
+    for idx, (z0, z1) in enumerate(zip(params["zbins_orig"][:-1], params["zbins_orig"][1:])):
         cond = (z0 < zred) & (zred <= z1)
         zID[cond] = idx
 
@@ -152,7 +123,6 @@ def getRedshiftIndex(params, zred):
 
 
 def getPregridName(params, z0, z1, chunkIndex=None, returnFull=True):
-
     suffixRedshift = "_z{:.0f}p{:.0f}_z{:.0f}p{:.0f}".format(
         z0 // 1, 10 * (z0 % 1), z1 // 1, 10 * (z1 % 1)
     )
@@ -173,32 +143,30 @@ def getPregridName(params, z0, z1, chunkIndex=None, returnFull=True):
     return fname
 
 
-def setupDBasisInput(catalog, magErrFloor=0.02, redshiftErrFloor=0.025):
-
+def setupDBasisInput(catalog, magErrScale=None, redshiftErrScale=0.025):
     obsFlux, obsFerr = np.zeros((2, len(catalog), len(filterSet.filters)), dtype=float)
     obsMask = np.ones((len(catalog), len(filterSet.filters)), dtype=bool)
 
-    for i, filt in enumerate(filterSet.filters):
+    if magErrScale is None:
+        magErrScale = getErrScale()
+    elif isinstance(magErrScale, float) or isinstance(magErrScale, int):
+        magErrScales = np.array([magErrScale] * len(filterSet.filters))
+        magErrScale = dict(zip(filterSet.filters, magErrScales))
+    else:
+        raise Exception("Invalid magErrScale arg.")
 
+    for i, filt in enumerate(filterSet.filters):
         obsFlux[:, i] = catalog["{:s}_FLUX".format(filt)]
         obsFerr[:, i] = catalog["{:s}_FLUXERR".format(filt)]
         obsMask[:, i] = catalog["{:s}_MASK".format(filt)]
 
-        ### Setup the floor in flux error
+        ### Setup the scaling for flux error
         cond = (obsFlux[:, i] > 0) & (obsFerr[:, i] > 0)
-        fluxErrFloor = (
-            magErrFloor * (obsFlux[cond, i] / obsFerr[cond, i]) * (np.log(10) / 2.5)
-        )
-        obsFerr[cond, i] = np.maximum(obsFerr[cond, i], fluxErrFloor)
+        fluxErrScale = magErrScale[filt] * (np.log(10) / 2.5) * obsFlux[cond, i]
+        obsFerr[cond, i] = np.sqrt(obsFerr[cond, i] ** 2 + fluxErrScale**2)
 
     obsZred = catalog["zphot"]
-    obsZerr = redshiftErrFloor * (1 + catalog["zphot"])
-
-    # if np.all(catalog["zphot_u68"]==-99) and np.all(catalog["zphot_l68"]==-99):
-    #     obsZerr = redshiftErrFloor * (1 + catalog["zphot"])
-    # else:
-    #     obsZerr = (catalog["zphot_u68"] - catalog["zphot_l68"]) / 2
-    #     obsZerr = np.clip(obsZerr, redshiftErrFloor * (1 + catalog["zphot"]), 0.5)
+    obsZerr = redshiftErrScale * (1 + catalog["zphot"])
 
     return {
         "flux": obsFlux,
@@ -210,7 +178,6 @@ def setupDBasisInput(catalog, magErrFloor=0.02, redshiftErrFloor=0.025):
 
 
 def getObsCatParsDict(catalog, obscat, catalogIndex):
-
     return {
         "objID": catalog["ID"][catalogIndex],
         "flux": obscat["flux"][catalogIndex, :].copy(),
@@ -222,9 +189,7 @@ def getObsCatParsDict(catalog, obscat, catalogIndex):
 
 
 def createMMap(atlas, mmapPrefix, pregridPath):
-
     for key in atlas.keys():
-
         mmapName = os.path.join(pregridPath, "%s_%s.mmap" % (mmapPrefix, key))
         if os.path.isfile(mmapName):
             os.remove(mmapName)

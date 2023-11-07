@@ -8,6 +8,7 @@ import astropy.io.fits as fits
 import matplotlib.pyplot as plt
 from collections import OrderedDict
 
+import esutil
 import numpy.lib.recfunctions as rfn
 from scipy.interpolate import interp1d
 from scipy.integrate import simps
@@ -248,3 +249,11 @@ def floorForFloats(a, precision=0):
     Generic function for rounding-down floats
     """
     return np.true_divide(np.floor(a * 10 ** precision), 10 ** precision)
+
+
+def matchRaDec(ra1, dec1, ra2, dec2, crit=0.5, maxmatch=1):
+
+    h = esutil.htm.HTM(10)
+    crit = crit / 3600.0  # crit arcsec
+    m1, m2, d12 = h.match(ra1, dec1, ra2, dec2, crit, maxmatch=maxmatch)
+    return m1, m2, d12

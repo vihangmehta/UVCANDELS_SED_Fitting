@@ -7,7 +7,6 @@ from astropy.cosmology import Planck15
 
 
 def calcModelBandFlux(wave, flux, band):
-
     if band in filterSet.filters:
         filtResp = filterSet.getResponse(band)
         filtPivot = filterSet.pivot[band]
@@ -26,14 +25,13 @@ def calcModelBandFlux(wave, flux, band):
     )
     filtSens = filtInterp(wave)
 
-    flux = flux * (light / wave ** 2)
+    flux = flux * (light / wave**2)
     flux = simps(flux * filtSens * wave, wave) / simps(filtSens * wave, wave)
-    flux = flux * (filtPivot ** 2 / light)
+    flux = flux * (filtPivot**2 / light)
     return flux
 
 
 def populateFitParams(results, atlas, chi2Index, normFactor, sfrErrCutoff=2.0):
-
     dtype = [
         ("ID", int),
         ("zbest", float),
@@ -71,6 +69,21 @@ def populateFitParams(results, atlas, chi2Index, normFactor, sfrErrCutoff=2.0):
         ("t80", float),
         ("t80_16", float),
         ("t80_84", float),
+        ("color_nuvu", float),
+        ("color_nuvu_16", float),
+        ("color_nuvu_84", float),
+        ("color_nuvr", float),
+        ("color_nuvr_16", float),
+        ("color_nuvr_84", float),
+        ("color_uv", float),
+        ("color_uv_16", float),
+        ("color_uv_84", float),
+        ("color_vj", float),
+        ("color_vj_16", float),
+        ("color_vj_84", float),
+        ("color_rj", float),
+        ("color_rj_16", float),
+        ("color_rj_84", float),
         ("logM_chi2", float),
         ("logSFR_chi2", float),
         ("Av_chi2", float),
@@ -82,6 +95,11 @@ def populateFitParams(results, atlas, chi2Index, normFactor, sfrErrCutoff=2.0):
         ("t40_chi2", float),
         ("t60_chi2", float),
         ("t80_chi2", float),
+        ("color_nuvu_chi2", float),
+        ("color_nuvr_chi2", float),
+        ("color_uv_chi2", float),
+        ("color_vj_chi2", float),
+        ("color_rj_chi2", float),
         ("nparam", int),
         ("nbands", int),
         ("chi2", float),
@@ -133,6 +151,22 @@ def populateFitParams(results, atlas, chi2Index, normFactor, sfrErrCutoff=2.0):
     output["t80_16"][0] = results["sfh"][1][6]
     output["t80_84"][0] = results["sfh"][2][6]
 
+    output["color_nuvu"][0] = results["nuvu"][0]
+    output["color_nuvu_16"][0] = results["nuvu"][1]
+    output["color_nuvu_84"][0] = results["nuvu"][2]
+    output["color_nuvr"][0] = results["nuvr"][0]
+    output["color_nuvr_16"][0] = results["nuvr"][1]
+    output["color_nuvr_84"][0] = results["nuvr"][2]
+    output["color_uv"][0] = results["uv"][0]
+    output["color_uv_16"][0] = results["uv"][1]
+    output["color_uv_84"][0] = results["uv"][2]
+    output["color_vj"][0] = results["vj"][0]
+    output["color_vj_16"][0] = results["vj"][1]
+    output["color_vj_84"][0] = results["vj"][2]
+    output["color_rj"][0] = results["rj"][0]
+    output["color_rj_16"][0] = results["rj"][1]
+    output["color_rj_84"][0] = results["rj"][2]
+
     output["chi2"][0] = np.amin(results["chi2"])
 
     output["logM_chi2"] = atlas["mstar"][chi2Index] + np.log10(normFactor)
@@ -144,6 +178,11 @@ def populateFitParams(results, atlas, chi2Index, normFactor, sfrErrCutoff=2.0):
     output["logSFR2_chi2"] = atlas["sfh_tuple"][chi2Index, 1] + np.log10(normFactor)
     for i, x in enumerate(["t20", "t40", "t60", "t80"]):
         output["%s_chi2" % x] = atlas["sfh_tuple"][chi2Index, 3 + i]
+    output["color_nuvu_chi2"][0] = atlas["nuvu"][chi2Index]
+    output["color_nuvr_chi2"][0] = atlas["nuvr"][chi2Index]
+    output["color_uv_chi2"][0] = atlas["uv"][chi2Index]
+    output["color_vj_chi2"][0] = atlas["vj"][chi2Index]
+    output["color_rj_chi2"][0] = atlas["rj"][chi2Index]
 
     # flagging galaxies that either
     # 1. have nan values for mass
@@ -165,7 +204,6 @@ def populateFitParams(results, atlas, chi2Index, normFactor, sfrErrCutoff=2.0):
 
 
 def populateModelMags(model, zbest):
-
     dtype = [("ID", int), ("zbest", float)]
 
     for band in filterSetJohnson.filters:
@@ -186,7 +224,7 @@ def populateModelMags(model, zbest):
             calcModelBandFlux(model["restwave"], model["Fnu"], band=band)
             * 1e-23
             / 1e6
-            * (4 * np.pi * lumDist ** 2)
+            * (4 * np.pi * lumDist**2)
             / (1 + zbest)
         )
 
@@ -207,16 +245,19 @@ def fitter(
     zerr,
     atlas,
     priors,
+    params,
     saveDir,
+    saveName,
     overwrite=False,
     cigaleCat=None,
     cigaleDir=None,
 ):
-
     import dense_basis as db
 
-    if (not overwrite) and os.path.isfile(
-        os.path.join(saveDir, "%d_best_model.fits.gz" % objID)
+    if (
+        (not overwrite)
+        and os.path.isfile(os.path.join(saveDir, "{:d}_{:s}.fits.gz".format(objID, saveName)))
+        and os.path.isfile(os.path.join(saveDir, "{:d}_{:s}.png".format(objID, saveName)))
     ):
         print(
             "Skipping objID#%d because output exists (not overwriting)" % objID,
@@ -241,9 +282,7 @@ def fitter(
     plotObsPhotometry(axis=axes[0], obsFlux=flux, obsFerr=ferr, obsMask=mask)
 
     # Setup the SedFitter class
-    fitter = db.SedFit(
-        sed=flux, sed_err=ferr, fit_mask=mask, zbest=zred, deltaz=zerr, atlas=atlas
-    )
+    fitter = db.SedFit(sed=flux, sed_err=ferr, fit_mask=mask, zbest=zred, deltaz=zerr, atlas=atlas)
 
     # Evaluate the best fit
     fitter.evaluate_likelihood()
@@ -257,6 +296,11 @@ def fitter(
         "Av": fitter.Av,
         "Z": fitter.Z,
         "z": fitter.z,
+        "nuvu": fitter.nuvu,
+        "nuvr": fitter.nuvr,
+        "uv": fitter.uv,
+        "vj": fitter.vj,
+        "rj": fitter.rj,
         "sfh": fitter.sfh_tuple,
         "chi2": fitter.chi2_array,
     }
@@ -298,6 +342,63 @@ def fitter(
     fitParams["delz"][0] = zerr
     fitParams["nbands"][0] = sum(mask)
 
+    # Save the model and parameters to file
+    hdu = fits.HDUList()
+    hdu.append(fits.PrimaryHDU())
+    hdu.append(fits.BinTableHDU(fitParams, name="FIT_PARAMS"))
+
+    # Compute the best-fit using the median best-fit parameters
+    # Compute the best-fit model spectrum
+    try:
+        specdetails = [fitter.sfh_tuple[0], fitter.Av[0], fitter.Z[0], fitter.z[0]]
+        wave, spec = db.makespec(specdetails, priors, db.mocksp, db.cosmo, return_spec=True)
+        bestModelEval = np.array(
+            list(zip(wave, wave * (1 + fitter.z[0]), spec)),
+            dtype=[("restwave", float), ("obswave", float), ("Fnu", float)],
+        )
+        # Populate the model mags
+        modelMagsEval = populateModelMags(model=bestModelEval, zbest=zred)
+        modelMagsEval["ID"][0] = objID
+        modelMagsEval["zbest"][0] = zred
+        # Compute the best-fit SFH
+        sfh, timeax = db.tuple_to_sfh(
+            fitter.sfh_tuple[0],
+            fitter.z[0],
+            decouple_sfr=priors.decouple_sfr,
+            decouple_sfr_time=priors.decouple_sfr_time,
+        )
+        sfh = np.interp(modTimeScale, timeax, sfh)
+        bestSFHEval = np.array(
+            list(zip(np.amax(modTimeScale) - modTimeScale, sfh)),
+            dtype=[("time", float), ("sfr", float)],
+        )
+        # Plot the model
+        plotModel(
+            model=bestModelEval,
+            modelMags=modelMagsEval,
+            sfh=bestSFHEval,
+            axisSpec=axes[0],
+            axisSFH=axes[1],
+            obsFlux=flux,
+            obsMask=mask,
+            color="tab:red",
+        )
+        # Plot the best-fit parameters on corner plot
+        truthsEval = [fitParams[x] for x in ["logM", "logSFR", "logZsol", "Av", "zfit"]]
+        truthsEval[2:2] = [fitParams[x] for x in txs]
+        plotCornerTruths(
+            axis=axes[2],
+            labels=plotLabels,
+            truths=truthsEval,
+            color="tab:red",
+        )
+        hdu.append(fits.BinTableHDU(modelMagsEval, name="MODEL_MAGS_BEST"))
+        hdu.append(fits.BinTableHDU(bestModelEval, name="MODEL_BEST"))
+        hdu.append(fits.BinTableHDU(bestSFHEval, name="SFH_BEST"))
+
+    except AssertionError:
+        print("Fit error for objID#{:d}".format(objID))
+
     # Compute the best-fit using the minimum chi2 soln
     # Compute the best-fit model spectrum
     wave, spec = db.makespec_atlas(
@@ -321,6 +422,7 @@ def fitter(
     # Populate the model mags
     modelMagsChi2 = populateModelMags(model=bestModelChi2, zbest=zred)
     modelMagsChi2["ID"][0] = objID
+    modelMagsChi2["zbest"][0] = zred
     # Compute the best-fit SFH
     sfh, timeax = db.tuple_to_sfh(
         fitter.atlas["sfh_tuple"][np.argmax(fitter.likelihood), 0:],
@@ -335,8 +437,8 @@ def fitter(
     )
     # Plot the model
     plotModel(
-        modelMags=modelMagsChi2,
         model=bestModelChi2,
+        modelMags=modelMagsChi2,
         sfh=bestSFHChi2,
         axisSpec=axes[0],
         axisSFH=axes[1],
@@ -345,85 +447,22 @@ def fitter(
         color="tab:orange",
     )
     # Plot the best-fit parameters on corner plot
-    truthsChi2 = [
-        fitParams[x + "_chi2"] for x in ["logM", "logSFR", "logZsol", "Av", "zfit"]
-    ]
+    truthsChi2 = [fitParams[x + "_chi2"] for x in ["logM", "logSFR", "logZsol", "Av", "zfit"]]
     truthsChi2[2:2] = [fitParams[x + "_chi2"] for x in txs]
-    plotCorner(
+    plotCornerTruths(
         axis=axes[2],
-        params=cornerParams,
         labels=plotLabels,
         truths=truthsChi2,
         color="tab:orange",
-        truthsOnly=True,
     )
-
-    # Compute the best-fit using the median best-fit parameters
-    # Compute the best-fit model spectrum
-    try:
-        specdetails = [fitter.sfh_tuple[0], fitter.Av[0], fitter.Z[0], fitter.z[0]]
-        wave, spec = db.makespec(
-            specdetails, priors, db.mocksp, db.cosmo, return_spec=True
-        )
-        bestModelEval = np.array(
-            list(zip(wave, wave * (1 + fitter.z[0]), spec)),
-            dtype=[("restwave", float), ("obswave", float), ("Fnu", float)],
-        )
-    except AssertionError:
-        print(
-            "Increasing age error for objID#%d" % objID, fitter.sfh_tuple[0], flush=True
-        )
-        bestModelEval = bestModelChi2
-    # Populate the model mags
-    modelMagsEval = populateModelMags(model=bestModelEval, zbest=zred)
-    modelMagsEval["ID"][0] = objID
-    # Compute the best-fit SFH
-    sfh, timeax = db.tuple_to_sfh(
-        fitter.sfh_tuple[0],
-        fitter.z[0],
-        decouple_sfr=priors.decouple_sfr,
-        decouple_sfr_time=priors.decouple_sfr_time,
-    )
-    sfh = np.interp(modTimeScale, timeax, sfh)
-    bestSFHEval = np.array(
-        list(zip(np.amax(modTimeScale) - modTimeScale, sfh)),
-        dtype=[("time", float), ("sfr", float)],
-    )
-    # Plot the model
-    plotModel(
-        modelMags=modelMagsEval,
-        model=bestModelEval,
-        sfh=bestSFHEval,
-        axisSpec=axes[0],
-        axisSFH=axes[1],
-        obsFlux=flux,
-        obsMask=mask,
-        color="tab:red",
-    )
-    # Plot the best-fit parameters on corner plot
-    truthsEval = [fitParams[x] for x in ["logM", "logSFR", "logZsol", "Av", "zfit"]]
-    truthsEval[2:2] = [fitParams[x] for x in txs]
-    plotCorner(
-        axis=axes[2],
-        params=cornerParams,
-        labels=plotLabels,
-        truths=truthsEval,
-        color="tab:red",
-        truthsOnly=True,
-    )
-
-    # Save the model and parameters to file
-    hdu = fits.HDUList()
-    hdu.append(fits.PrimaryHDU())
-    hdu.append(fits.BinTableHDU(fitParams, name="FIT_PARAMS"))
-    hdu.append(fits.BinTableHDU(modelMagsEval, name="MODEL_MAGS_BEST"))
-    hdu.append(fits.BinTableHDU(bestModelEval, name="MODEL_BEST"))
-    hdu.append(fits.BinTableHDU(bestSFHEval, name="SFH_BEST"))
+    # Add the model and parameters to the output save file
     hdu.append(fits.BinTableHDU(modelMagsChi2, name="MODEL_MAGS_CHI2"))
     hdu.append(fits.BinTableHDU(bestModelChi2, name="MODEL_CHI2"))
     hdu.append(fits.BinTableHDU(bestSFHChi2, name="SFH_CHI2"))
+
     hdu.writeto(
-        os.path.join(saveDir, "{:d}_best_model.fits.gz".format(objID)), overwrite=True
+        os.path.join(saveDir, "{:d}_{:s}.fits.gz".format(objID, saveName)),
+        overwrite=True,
     )
 
     # Plot the best-fit parameters
@@ -457,35 +496,37 @@ def fitter(
         )
 
     if saveDir:
-        savename = "objID{:05d}.png".format(objID)
-        fig.savefig(os.path.join(saveDir, savename))
+        fig.savefig(os.path.join(saveDir, "{:d}_{:s}.png".format(objID, saveName)))
         plt.close(fig)
     else:
         plt.show()
 
 
-def worker(catalogIndex, catalog, obscat, priors, atlas, saveDir, overwrite):
+def worker(catalogIndex, catalog, obscat, priors, params, atlas, saveDir, saveName, overwrite):
+    parsDict = getObsCatParsDict(catalog=catalog, obscat=obscat, catalogIndex=catalogIndex)
 
-    parsDict = getObsCatParsDict(
-        catalog=catalog, obscat=obscat, catalogIndex=catalogIndex
+    fitter(
+        **parsDict,
+        priors=priors,
+        params=params,
+        atlas=atlas,
+        saveDir=saveDir,
+        saveName=saveName,
+        overwrite=overwrite
     )
 
-    fitter(**parsDict, priors=priors, atlas=atlas, saveDir=saveDir, overwrite=overwrite)
 
-
-def main(field, catalog, params, nproc, overwrite=False):
-
+def main(field, catalog, params, saveName, nproc, overwrite=False):
     from schwimmbad import MultiPool
     from functools import partial
     import dense_basis as db
 
-    obscat = setupDBasisInput(catalog=catalog, magErrFloor=0.02, redshiftErrFloor=0.025)
+    obscat = setupDBasisInput(catalog=catalog, redshiftErrScale=0.025)
 
     catalogIndexs = np.arange(len(obscat["zred"]))
     redshiftIndexs = getRedshiftIndex(params=params, zred=obscat["zred"])
 
     for redshiftIndex in range(len(params["zbins"])):
-
         priors = getPriors(
             Npars=params["Npars"],
             zmin=params["zbins"][redshiftIndex][0],
@@ -512,8 +553,10 @@ def main(field, catalog, params, nproc, overwrite=False):
                         catalog=catalog,
                         obscat=obscat,
                         priors=priors,
+                        params=params,
                         atlas=atlas,
                         saveDir=os.path.join(outputPath, field),
+                        saveName=saveName,
                         overwrite=overwrite,
                     ),
                     catalogIndexs[redshiftIndexs == redshiftIndex],
@@ -521,13 +564,13 @@ def main(field, catalog, params, nproc, overwrite=False):
             )
 
 
-def test(catalogIndex, field, catalog, params, overwrite=False):
-
+def test(catalogIndex, field, catalog, params, saveName, overwrite=False):
     import dense_basis as db
 
-    obscat = setupDBasisInput(catalog=catalog, magErrFloor=0.02, redshiftErrFloor=0.025)
+    obscat = setupDBasisInput(catalog=catalog, redshiftErrScale=0.025)
 
     redshiftIndex = getRedshiftIndex(params=params, zred=obscat["zred"][catalogIndex])
+    print(redshiftIndex, obscat["zred"][catalogIndex])
 
     priors = getPriors(
         Npars=params["Npars"],
@@ -552,22 +595,30 @@ def test(catalogIndex, field, catalog, params, overwrite=False):
         catalog=catalog,
         obscat=obscat,
         priors=priors,
+        params=params,
         atlas=atlas,
         saveDir=os.path.join(outputPath, field),
+        saveName=saveName,
         overwrite=overwrite,
     )
 
 
-def mkFinalOutput(field, catalog, params):
+def mkFinalOutput(field, catalog, params, saveName):
+    saveDir = os.path.join(outputPath, field)
 
-    saveDir = os.path.join(bestfitPath, field)
+    tempName = glob.glob("{:s}/*_{:s}.fits.gz".format(saveDir, saveName))[0]
+    dtypeFitParams = fits.getdata(tempName, extname="FIT_PARAMS").dtype.descr
+    dtypeModelMags = fits.getdata(tempName, extname="MODEL_MAGS_BEST").dtype.descr
 
-    tempName = glob.glob("{:s}/*_best_model.fits.gz".format(saveDir))[0]
-    dtype = fits.getdata(tempName, extname="FIT_PARAMS").dtype.descr
-    dtype += fits.getdata(tempName, extname="MODEL_MAGS_BEST").dtype.descr[1:]
+    cond = [_ not in dtypeFitParams for _ in dtypeModelMags]
+    dtypeModelMags = [dtypeModelMags[i] for i in np.where(cond)[0]]
+    dtype = dtypeFitParams + dtypeModelMags
+
+    output = np.recarray(len(catalog), dtype=dtype)
+    for x in output.dtype.names:
+        output[x] = -99.0
 
     for k, entry in enumerate(catalog):
-
         if (k + 1) % 100 == 0:
             print(
                 "\rProcessing %s obj#%5d/%5d ... " % (field, k + 1, len(catalog)),
@@ -575,81 +626,70 @@ def mkFinalOutput(field, catalog, params):
                 flush=True,
             )
 
-        fname = os.path.join(saveDir, "%s_best_model.fits.gz" % entry["ID"])
+        fname = os.path.join(saveDir, "{:d}_{:s}.fits.gz".format(entry["ID"], saveName))
 
         if os.path.isfile(fname):
+            try:
+                modelMags = fits.getdata(fname, extname="MODEL_MAGS_BEST")
+                for x in modelMags.dtype.names:
+                    output[x][k] = modelMags[x][0]
+            except KeyError:
+                pass
+
             fitParams = fits.getdata(fname, extname="FIT_PARAMS")
-            modelMags = fits.getdata(fname, extname="MODEL_MAGS_BEST")
-        else:
-            row = np.recarray(1, dtype=dtype)
-            for x in row.dtype.names:
-                row[x] = -99.0
-            row["ID"] = entry["ID"]
-            row["zbest"] = entry["zphot"]
-
-        if k == 0:
-            output = np.recarray(len(catalog), dtype=dtype)
-
-        for x in output.dtype.names:
-            if x in fitParams.dtype.names:
+            for x in fitParams.dtype.names:
                 output[x][k] = fitParams[x][0]
-            elif x in modelMags.dtype.names:
-                output[x][k] = modelMags[x][0]
-            else:
-                raise Exception("Invalid column name.")
+
+        else:
+            output["ID"][k] = entry["ID"]
+            output["zbest"][k] = entry["zphot"]
 
     print("done")
 
     fits.writeto(
-        os.path.join(outputPath, "{:s}_{:s}_out.fits".format(field, params["prefix"])),
+        os.path.join(outputPath, "{:s}_{:s}_dbasis.fits".format(params["prefix"], field)),
         output,
         overwrite=True,
     )
 
 
 if __name__ == "__main__":
-
     import argparse
 
     parser = argparse.ArgumentParser()
 
-    parser.add_argument(
-        "-f", "--field", type=str, help="specify the field", default=None
-    )
-    parser.add_argument(
-        "-n", "--nproc", type=int, help="specify number of processes", default=35
-    )
+    parser.add_argument("-f", "--field", type=str, help="specify the field", default=None)
+    parser.add_argument("-n", "--nproc", type=int, help="specify number of processes", default=35)
     parser.add_argument("-t", "--test", help="run test case", action="store_true")
-    parser.add_argument(
-        "-o", "--overwrite", help="clobber existing output", action="store_true"
-    )
+    parser.add_argument("-o", "--overwrite", help="clobber existing output", action="store_true")
 
     args = parser.parse_args()
 
     if args.field not in fields:
         raise Exception("Invalid field selected.")
 
-    params = getParams(runVersion="test")
+    params = getParams(runVersion="v1")
     catalog = getCatalog(field=args.field)
+    saveName = "bestmodel_dbasis"
 
     if args.test:
-
         test(
-            catalogIndex=16553,
+            catalogIndex=28593,
             field=args.field,
             catalog=catalog,
             params=params,
+            saveName=saveName,
             overwrite=args.overwrite,
         )
 
     else:
+        # main(
+        #     field=args.field,
+        #     catalog=catalog,
+        #     params=params,
+        #     saveName=saveName,
+        #     nproc=args.nproc,
+        #     overwrite=args.overwrite,
+        # )
 
-        main(
-            field=args.field,
-            catalog=catalog,
-            params=params,
-            nproc=args.nproc,
-            overwrite=args.overwrite,
-        )
-
-        mkFinalOutput(field=args.field, catalog=catalog, params=params)
+        mkFinalOutput(field=args.field, catalog=catalog, params=params, saveName=saveName)
